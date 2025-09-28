@@ -56,6 +56,9 @@ install_base() {
     opensuse-tumbleweed)
         zypper refresh && zypper -q install -y wget curl tar timezone qrencode
         ;;
+    alpine)
+        apk update && apk add wget curl tar tzdata libqrencode
+        ;;
     *)
         apt-get update && apt-get install -y -q wget curl tar tzdata qrencode
         ;;
@@ -69,59 +72,27 @@ gen_random_string() {
 }
 
 generate_qr_code() {
-    local username="$1"
-    local password="$2"
-    local port="$3"
-    local webBasePath="$4"
-    local server_ip="$5"
+    local server_ip="$1"
+    local port="$2"
+    local webBasePath="$3"
+    local username="$4"
+    local password="$5"
     
-    # æž„å»ºJSONå­—ç¬¦ä¸²
-    local json_data="{\"name\":\"3XUI\",\"url\":\"${server_ip}:${port}/${webBasePath}/\",\"protocol\":\"http\",\"type\":\"3x-ui\",\"username\":\"${username}\",\"password\":\"${password}\"}"
+    local qr_data=$(cat <<EOF
+{
+  "name": "3X-UI",
+  "url": "${server_ip}:${port}/${webBasePath}",
+  "protocol": "http",
+  "type": "3x-ui",
+  "username": "${username}",
+  "password": "${password}"
+}
+EOF
+)
     
+    echo -e "${blue}QR Code for 3X-UI Access:${plain}"
+    echo "$qr_data" | qrencode -t ANSIUTF8
     echo -e ""
-    echo -e "${green}Generating QR Code for easy access...${plain}"
-    echo -e "###############################################"
-    
-    # ç"ŸæˆäºŒç»´ç 
-    if command -v qrencode >/dev/null 2>&1; then
-        echo "$json_data" | qrencode -t ANSIUTF8
-        echo -e ""
-        echo -e "${blue}QR Code Data:${plain}"
-        echo -e "${yellow}$json_data${plain}"
-    else
-        echo -e "${red}qrencode not found. Installing...${plain}"
-        case "${release}" in
-        ubuntu | debian | armbian)
-            apt-get install -y qrencode
-            ;;
-        centos | rhel | almalinux | rocky | ol)
-            yum install -y qrencode
-            ;;
-        fedora | amzn | virtuozzo)
-            dnf install -y qrencode
-            ;;
-        arch | manjaro | parch)
-            pacman -S --noconfirm qrencode
-            ;;
-        opensuse-tumbleweed)
-            zypper install -y qrencode
-            ;;
-        *)
-            apt-get install -y qrencode
-            ;;
-        esac
-        
-        if command -v qrencode >/dev/null 2>&1; then
-            echo "$json_data" | qrencode -t ANSIUTF8
-            echo -e ""
-            echo -e "${blue}QR Code Data:${plain}"
-            echo -e "${yellow}$json_data${plain}"
-        else
-            echo -e "${red}Failed to install qrencode. Please install manually and scan this data:${plain}"
-            echo -e "${yellow}$json_data${plain}"
-        fi
-    fi
-    echo -e "###############################################"
 }
 
 config_after_install() {
@@ -143,12 +114,6 @@ config_after_install() {
             break
         fi
     done
-
-    # å£°æ˜Žå˜é‡ç"¨äºŽäºŒç»´ç ç"Ÿæˆ
-    local qr_username=""
-    local qr_password=""
-    local qr_port=""
-    local qr_webBasePath=""
 
     if [[ ${#existing_webBasePath} -lt 4 ]]; then
         if [[ "$existing_hasDefaultCredential" == "true" ]]; then
@@ -175,11 +140,8 @@ config_after_install() {
             echo -e "${green}Access URL: http://${server_ip}:${config_port}/${config_webBasePath}${plain}"
             echo -e "###############################################"
             
-            # è®¾ç½®äºŒç»´ç å‚æ•°
-            qr_username="${config_username}"
-            qr_password="${config_password}"
-            qr_port="${config_port}"
-            qr_webBasePath="${config_webBasePath}"
+            # Generate QR Code
+            generate_qr_code "${server_ip}" "${config_port}" "${config_webBasePath}" "${config_username}" "${config_password}"
         else
             local config_webBasePath=$(gen_random_string 18)
             echo -e "${yellow}WebBasePath is missing or too short. Generating a new one...${plain}"
@@ -187,14 +149,10 @@ config_after_install() {
             echo -e "${green}New WebBasePath: ${config_webBasePath}${plain}"
             echo -e "${green}Access URL: http://${server_ip}:${existing_port}/${config_webBasePath}${plain}"
             
-            # èŽ·å–çŽ°æœ‰ç"¨æˆ·åå'Œå¯†ç ç"¨äºŽäºŒç»´ç 
+            # Get existing username and password for QR code
             local existing_username=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'username: .+' | awk '{print $2}')
             local existing_password=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'password: .+' | awk '{print $2}')
-            
-            qr_username="${existing_username}"
-            qr_password="${existing_password}"
-            qr_port="${existing_port}"
-            qr_webBasePath="${config_webBasePath}"
+            generate_qr_code "${server_ip}" "${existing_port}" "${config_webBasePath}" "${existing_username}" "${existing_password}"
         fi
     else
         if [[ "$existing_hasDefaultCredential" == "true" ]]; then
@@ -209,49 +167,72 @@ config_after_install() {
             echo -e "${green}Password: ${config_password}${plain}"
             echo -e "###############################################"
             
-            qr_username="${config_username}"
-            qr_password="${config_password}"
-            qr_port="${existing_port}"
-            qr_webBasePath="${existing_webBasePath}"
+            # Generate QR Code with existing webBasePath and port
+            generate_qr_code "${server_ip}" "${existing_port}" "${existing_webBasePath}" "${config_username}" "${config_password}"
         else
             echo -e "${green}Username, Password, and WebBasePath are properly set. Exiting...${plain}"
             
-            # èŽ·å–çŽ°æœ‰è®¾ç½®ç"¨äºŽäºŒç»´ç 
+            # Get existing credentials for QR code
             local existing_username=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'username: .+' | awk '{print $2}')
             local existing_password=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'password: .+' | awk '{print $2}')
-            
-            qr_username="${existing_username}"
-            qr_password="${existing_password}"
-            qr_port="${existing_port}"
-            qr_webBasePath="${existing_webBasePath}"
+            generate_qr_code "${server_ip}" "${existing_port}" "${existing_webBasePath}" "${existing_username}" "${existing_password}"
         fi
     fi
 
     /usr/local/x-ui/x-ui migrate
-    
-    # ç"ŸæˆäºŒç»´ç 
-    if [[ -n "$qr_username" && -n "$qr_password" && -n "$qr_port" && -n "$qr_webBasePath" ]]; then
-        generate_qr_code "$qr_username" "$qr_password" "$qr_port" "$qr_webBasePath" "$server_ip"
-    fi
 }
 
 install_x-ui() {
     cd /usr/local/
 
-    # 固定安装v2.7.0版本
-    tag_version="v2.7.0"
-    echo -e "Installing x-ui version: ${tag_version}"
-    wget -N -O /usr/local/x-ui-linux-$(arch).tar.gz https://github.com/MHSanaei/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz
+    # Download resources
+    if [ $# == 0 ]; then
+        tag_version=$(curl -Ls "https://api.github.com/repos/MHSanaei/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        if [[ ! -n "$tag_version" ]]; then
+            echo -e "${yellow}Trying to fetch version with IPv4...${plain}"
+            tag_version=$(curl -4 -Ls "https://api.github.com/repos/MHSanaei/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+            if [[ ! -n "$tag_version" ]]; then
+                echo -e "${red}Failed to fetch x-ui version, it may be due to GitHub API restrictions, please try it later${plain}"
+                exit 1
+            fi
+        fi
+        echo -e "Got x-ui latest version: ${tag_version}, beginning the installation..."
+        wget --inet4-only -N -O /usr/local/x-ui-linux-$(arch).tar.gz https://github.com/MHSanaei/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz
+        if [[ $? -ne 0 ]]; then
+            echo -e "${red}Downloading x-ui failed, please be sure that your server can access GitHub ${plain}"
+            exit 1
+        fi
+    else
+        tag_version=$1
+        tag_version_numeric=${tag_version#v}
+        min_version="2.3.5"
+
+        if [[ "$(printf '%s\n' "$min_version" "$tag_version_numeric" | sort -V | head -n1)" != "$min_version" ]]; then
+            echo -e "${red}Please use a newer version (at least v2.3.5). Exiting installation.${plain}"
+            exit 1
+        fi
+
+        url="https://github.com/MHSanaei/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
+        echo -e "Beginning to install x-ui $1"
+        wget --inet4-only -N -O /usr/local/x-ui-linux-$(arch).tar.gz ${url}
+        if [[ $? -ne 0 ]]; then
+            echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
+            exit 1
+        fi
+    fi
+    wget --inet4-only -O /usr/bin/x-ui-temp https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh
     if [[ $? -ne 0 ]]; then
-        echo -e "${red}Downloading x-ui ${tag_version} failed, please be sure that your server can access GitHub ${plain}"
+        echo -e "${red}Failed to download x-ui.sh${plain}"
         exit 1
     fi
 
-    wget -O /usr/bin/x-ui-temp https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh
-
     # Stop x-ui service and remove old resources
     if [[ -e /usr/local/x-ui/ ]]; then
-        systemctl stop x-ui
+        if [[ $release == "alpine" ]]; then
+            rc-service x-ui stop
+        else
+            systemctl stop x-ui
+        fi
         rm /usr/local/x-ui/ -rf
     fi
 
@@ -275,13 +256,25 @@ install_x-ui() {
     chmod +x /usr/bin/x-ui
     config_after_install
 
-    cp -f x-ui.service /etc/systemd/system/
-    systemctl daemon-reload
-    systemctl enable x-ui
-    systemctl start x-ui
+    if [[ $release == "alpine" ]]; then
+        wget --inet4-only -O /etc/init.d/x-ui https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.rc
+        if [[ $? -ne 0 ]]; then
+            echo -e "${red}Failed to download x-ui.rc${plain}"
+            exit 1
+        fi
+        chmod +x /etc/init.d/x-ui
+        rc-update add x-ui
+        rc-service x-ui start
+    else
+        cp -f x-ui.service /etc/systemd/system/
+        systemctl daemon-reload
+        systemctl enable x-ui
+        systemctl start x-ui
+    fi
+
     echo -e "${green}x-ui ${tag_version}${plain} installation finished, it is running now..."
     echo -e ""
-    echo -e "┌─────────────────────────────────────────────────────┐"
+    echo -e "┌───────────────────────────────────────────────────────┐"
     echo -e "│  ${blue}x-ui control menu usages (subcommands):${plain}              │"
     echo -e "│                                                       │"
     echo -e "│  ${blue}x-ui${plain}              - Admin Management Script          │"
@@ -298,9 +291,9 @@ install_x-ui() {
     echo -e "│  ${blue}x-ui legacy${plain}       - legacy version                   │"
     echo -e "│  ${blue}x-ui install${plain}      - Install                          │"
     echo -e "│  ${blue}x-ui uninstall${plain}    - Uninstall                        │"
-    echo -e "└─────────────────────────────────────────────────────┘"
+    echo -e "└───────────────────────────────────────────────────────┘"
 }
 
 echo -e "${green}Running...${plain}"
 install_base
-install_x-ui
+install_x-ui $1
