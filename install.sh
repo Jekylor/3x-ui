@@ -163,6 +163,7 @@ config_after_install() {
             /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}"
             echo -e "Generated new random login credentials:"
             echo -e "###############################################"
+			echo -e "${green}Access URL: http://${server_ip}:${existing_port}/${existing_webBasePath}${plain}"
             echo -e "${green}Username: ${config_username}${plain}"
             echo -e "${green}Password: ${config_password}${plain}"
             echo -e "###############################################"
@@ -274,7 +275,7 @@ install_x-ui() {
 
     echo -e "${green}x-ui ${tag_version}${plain} installation finished, it is running now..."
     echo -e ""
-    echo -e "┌───────────────────────────────────────────────────────┐"
+    echo -e "┌──────────────────────────────────────────────────────┐"
     echo -e "│  ${blue}x-ui control menu usages (subcommands):${plain}              │"
     echo -e "│                                                       │"
     echo -e "│  ${blue}x-ui${plain}              - Admin Management Script          │"
@@ -291,7 +292,7 @@ install_x-ui() {
     echo -e "│  ${blue}x-ui legacy${plain}       - legacy version                   │"
     echo -e "│  ${blue}x-ui install${plain}      - Install                          │"
     echo -e "│  ${blue}x-ui uninstall${plain}    - Uninstall                        │"
-    echo -e "└───────────────────────────────────────────────────────┘"
+    echo -e "└──────────────────────────────────────────────────────┘"
 }
 
 echo -e "${green}Running...${plain}"
