@@ -81,7 +81,7 @@ generate_qr_code() {
     local qr_data=$(cat <<EOF
 {
   "name": "3X-UI",
-  "url": "${server_ip}:${port}/${webBasePath}",
+  "url": "${server_ip}:${port}${webBasePath}",
   "protocol": "http",
   "type": "3x-ui",
   "username": "${username}",
@@ -133,15 +133,15 @@ config_after_install() {
             /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}" -port "${config_port}" -webBasePath "${config_webBasePath}"
             echo -e "This is a fresh installation, generating random login info for security concerns:"
             echo -e "###############################################"
+			echo -e "${green}Access URL: http://${server_ip}:${config_port}/${config_webBasePath}${plain}"
             echo -e "${green}Username: ${config_username}${plain}"
             echo -e "${green}Password: ${config_password}${plain}"
             echo -e "${green}Port: ${config_port}${plain}"
             echo -e "${green}WebBasePath: ${config_webBasePath}${plain}"
-            echo -e "${green}Access URL: http://${server_ip}:${config_port}/${config_webBasePath}${plain}"
             echo -e "###############################################"
             
             # Generate QR Code
-            generate_qr_code "${server_ip}" "${config_port}" "${config_webBasePath}" "${config_username}" "${config_password}"
+            generate_qr_code "${server_ip}" "${config_port}" "/${config_webBasePath}" "${config_username}" "${config_password}"
         else
             local config_webBasePath=$(gen_random_string 18)
             echo -e "${yellow}WebBasePath is missing or too short. Generating a new one...${plain}"
@@ -152,7 +152,7 @@ config_after_install() {
             # Get existing username and password for QR code
             local existing_username=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'username: .+' | awk '{print $2}')
             local existing_password=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'password: .+' | awk '{print $2}')
-            generate_qr_code "${server_ip}" "${existing_port}" "${config_webBasePath}" "${existing_username}" "${existing_password}"
+            generate_qr_code "${server_ip}" "${existing_port}" "/${config_webBasePath}" "${existing_username}" "${existing_password}"
         fi
     else
         if [[ "$existing_hasDefaultCredential" == "true" ]]; then
@@ -163,7 +163,7 @@ config_after_install() {
             /usr/local/x-ui/x-ui setting -username "${config_username}" -password "${config_password}"
             echo -e "Generated new random login credentials:"
             echo -e "###############################################"
-			echo -e "${green}Access URL: http://${server_ip}:${existing_port}/${existing_webBasePath}${plain}"
+			echo -e "${green}Access URL: http://${server_ip}:${existing_port}${existing_webBasePath}${plain}"
             echo -e "${green}Username: ${config_username}${plain}"
             echo -e "${green}Password: ${config_password}${plain}"
             echo -e "###############################################"
